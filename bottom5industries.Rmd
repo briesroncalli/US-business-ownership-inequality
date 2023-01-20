@@ -1,0 +1,193 @@
+---
+title: "Business Ownership in the Bottom 5 Performing Industries"
+author: "Ben Ries-Roncalli"
+date: "3/14/2022"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(maps)
+library(socviz)
+library(tidyverse)
+library("readxl")
+library(lubridate)
+library(ggthemes)
+library(RColorBrewer)
+library(ggplot2)
+library(ggrepel)
+library(readr)
+```
+
+
+```{r, include=FALSE}
+file <- './Data/Full_2017_3_Dig.csv'
+full_df <- read.csv(file, na.strings = c("S", "D", "N", "X"))
+full_df <- full_df %>%
+  rename(
+    naics_code_3_digit = NAICS2017,
+    naics_label = NAICS2017_LABEL,
+    sex_label = SEX_LABEL,
+    ethnicity_label = ETH_GROUP_LABEL,
+    race_label = RACE_GROUP_LABEL,
+    employer_firms = FIRMPDEMP,
+    sales = RCPPDEMP,
+  )
+
+full_df$employer_firms <- gsub("," ,"", full_df$employer_firms)
+full_df$sales <- as.integer(full_df$sales)
+full_df$employer_firms <- as.integer(full_df$employer_firms)
+full_df$sales_per_firm <- full_df$sales/full_df$employer_firms
+
+model_colors <- brewer.pal(8,"Dark2")
+```
+
+
+```{r}
+ff_df <- full_df %>%
+  filter(naics_code_3_digit==812|naics_code_3_digit==114|naics_code_3_digit==811|naics_code_3_digit==113|naics_code_3_digit==453) %>%
+  select(naics_code_3_digit, naics_label, sex_label, ethnicity_label, race_label, employer_firms)
+ff_df[is.na(ff_df)] = 0
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Forestry and Logging", "Forestry & Logging")
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Fishing, hunting and trapping", "Fishing, Hunting & Trapping")
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Miscellaneous store retailers", "Misc. Store Retailers")
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Repair and maintenance", "Repair & Maintenance")
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Personal and laundry services", "Personal & Laundry Services")
+ff_df$race_label <- str_replace(ff_df$race_label, "Native Hawaiian and Other Pacific Islander", "Nat. Hawaiian & Other Pacific Islander")
+ff_df$race_label <- str_replace(ff_df$race_label, "American Indian and Alaska Native", "American Indian & Alaska Native")
+ff_df$ethnicity_label <- str_replace(ff_df$ethnicity_label, "Equally Hispanic/non-Hispanic", "Equally Hispanic/Non-Hispanic")
+ff_df$minority = ff_df$race_label
+minorities <-c("Native Hawaiian & Other Pacific Islander|Black or African American|American Indian & Alaska Native|Asian")
+ff_df$minority <- str_replace(ff_df$minority, minorities, "Nonwhite")
+ff_df$ethnicity_label <- factor(ff_df$ethnicity_label, levels = c("Non-Hispanic", "Hispanic", "Equally Hispanic/Non-Hispanic"))
+ff_df$sex_label <- factor(ff_df$sex_label, levels = c("Male", "Female"))
+ff_df$minority <- factor(ff_df$minority, levels = c("White", "Nonwhite"))
+ff_df$race_label <- factor(ff_df$race_label, levels = c("White", "Asian", "Black or African American", "Native Hawaiian & Other Pacific Islander"))
+
+ff_df
+```
+
+```{r}
+unclass <- ff_df %>%
+  filter(race_label == "Unclassifiable")
+num_unclass <- unclass$employer_firms
+print('The number of unclassifiable firms for these industries are:')
+num_unclass
+```
+
+
+
+```{r}
+sex_firms <- ff_df %>%
+  filter(sex_label!="Classifiable", sex_label!="Total", sex_label!="Unclassifiable") %>%
+  select(sex_label,employer_firms) %>%
+  group_by(sex_label) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+p <- ggplot(data = sex_firms, mapping = aes(x = reorder(sex_label,-pct), y = pct, fill=sex_label))
+
+
+p + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5) + scale_fill_manual(values=model_colors) + labs(title="Bottom 5 Performing Industries by Sex", x="", y="Percent") + coord_cartesian(ylim = c(0,100))
+```
+
+
+```{r}
+sex_firms <- ff_df %>%
+  select(naics_label, sex_label, employer_firms) %>%
+  filter(sex_label!="Classifiable", sex_label!="Total", sex_label!="Unclassifiable") %>%
+  group_by(naics_label, sex_label) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+p <- ggplot(data = sex_firms, mapping = aes(x = reorder(sex_label,-pct), y = pct, fill=sex_label))
+
+p + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5) + scale_fill_manual(values=model_colors) + labs(title="Bottom 5 Performing Industries by Sex", x="", y="Percent") + facet_wrap(~naics_label) + coord_cartesian(ylim = c(0,105))
+```
+
+
+```{r}
+eth_firms <- ff_df %>%
+  filter(ethnicity_label!="Total", ethnicity_label!="Classifiable", ethnicity_label!="Unclassifiable") %>%
+  select(ethnicity_label,employer_firms) %>%
+  group_by(ethnicity_label) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+eth_firms$ethnicity_label <- factor(eth_firms$ethnicity_label, levels = c("Non-Hispanic", "Hispanic", "Equally Hispanic/Non-Hispanic"))
+
+p <- ggplot(data = eth_firms, mapping = aes(x = reorder(ethnicity_label,-pct), y = pct, fill=ethnicity_label))
+
+p + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5) + scale_fill_manual(values=model_colors) + labs(title="Bottom 5 Performing Industries by Ethnicity", x="", y="Percent") + coord_cartesian(ylim = c(0,100))
+```
+
+
+```{r}
+eth_firms <- ff_df %>%
+  select(naics_label, ethnicity_label, employer_firms) %>%
+  filter(ethnicity_label!="Total", ethnicity_label!="Classifiable", ethnicity_label!="Unclassifiable") %>%
+  group_by(naics_label, ethnicity_label) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+p <- ggplot(data = eth_firms, mapping = aes(x = reorder(ethnicity_label, -pct), y = pct, fill=ethnicity_label))
+
+p + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5) + scale_fill_manual(values=model_colors) + labs(title="Bottom 5 Performing Industries by Ethnicity", x="", y="Percent") + facet_wrap(~naics_label) + coord_cartesian(ylim = c(0,110))
+```
+
+
+
+```{r}
+race_firms <- ff_df %>%
+  filter(minority!="Total", minority!="Classifiable", minority!="Unclassifiable") %>%
+  select(minority,employer_firms) %>%
+  group_by(minority) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(minority, -pct), y = pct, fill=minority))
+
+p + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5) + scale_fill_manual(values=model_colors) + labs(title="Bottom 5 Performing Industries by Race", x="", y="Percent") + coord_cartesian(ylim = c(0,100))
+```
+
+
+
+```{r}
+race_firms <- ff_df %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable", race_label!="White") %>%
+  select(race_label,employer_firms) %>%
+  group_by(race_label) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+p <- ggplot(data = race_firms, mapping = aes(x = race_label, y = pct, fill=race_label))
+
+p + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + labs(title="Bottom 5 Performing Industries by Race (Nonwhite)", x="", y="Percent") + coord_cartesian(ylim = c(0,100)) + scale_fill_manual(values=model_colors[3:8]) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5)
+```
+
+```{r}
+race_firms <- ff_df %>%
+  filter(minority!="Total", minority!="Classifiable", minority!="Unclassifiable") %>%
+  select(minority,employer_firms, naics_label) %>%
+  group_by(naics_label, minority) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(minority, -pct), y = pct, fill=minority))
+
+p  + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5) + scale_fill_manual(values=model_colors) + labs(title="Bottom 5 Performing Industries by Race", x="", y="Percent") + facet_wrap(~naics_label) + coord_cartesian(ylim = c(0,110))
+```
+
+
+```{r}
+race_firms <- ff_df %>%
+  select(naics_label, race_label, employer_firms) %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable", race_label!="White") %>%
+  group_by(naics_label, race_label) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,1))
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(race_label, -pct), y = pct, fill=race_label))
+
+p + geom_hline(yintercept = c(0,25,50,75,100), size=0.2, color='Gray') + geom_col(position = "dodge") + theme_bw() + theme(legend.position="bottom", axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.title = element_blank(), panel.border = element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank()) + scale_y_continuous(breaks = c(0,25,50,75,100), labels=c(0,25,50,75,100)) + geom_text(aes(label = paste0(pct, "%")), color = "black", vjust = -0.5) + scale_fill_manual(values=model_colors[3:8]) + labs(title="Bottom 5 Performing Industries by Race (Nonwhite)", x="", y="Percent") + facet_wrap(~naics_label) + coord_cartesian(ylim = c(0,110))
+```
+

@@ -1,0 +1,230 @@
+---
+title: "Business Ownership in the Top 5 Performing Industries"
+author: "Ben Ries-Roncalli"
+date: "3/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(maps)
+library(socviz)
+library(tidyverse)
+library("readxl")
+library(lubridate)
+library(ggthemes)
+library(RColorBrewer)
+library(ggplot2)
+```
+
+
+```{r, include=FALSE}
+library(readr)
+file <- './Data/Full_2017_3_Dig.csv'
+full_df <- read.csv(file, na.strings = c("S", "D", "N", "X"))
+full_df <- full_df %>%
+  rename(
+    naics_code_3_digit = NAICS2017,
+    naics_label = NAICS2017_LABEL,
+    sex_label = SEX_LABEL,
+    ethnicity_label = ETH_GROUP_LABEL,
+    race_label = RACE_GROUP_LABEL,
+    employer_firms = FIRMPDEMP,
+    sales = RCPPDEMP,
+  )
+
+full_df$employer_firms <- gsub("," ,"", full_df$employer_firms)
+full_df$sales <- as.integer(full_df$sales)
+full_df$employer_firms <- as.integer(full_df$employer_firms)
+full_df$sales_per_firm <- full_df$sales/full_df$employer_firms
+```
+
+
+```{r}
+ff_df <- full_df %>%
+  filter(naics_code_3_digit==324|naics_code_3_digit==221|naics_code_3_digit==336|naics_code_3_digit==486|naics_code_3_digit==622) %>%
+  select(naics_code_3_digit, naics_label, sex_label, ethnicity_label, race_label, employer_firms)
+ff_df[is.na(ff_df)] = 0
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Pipeline transportation", "Pipeline Transp.")
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Transportation equipment manufacturing", "Transp. Equip. Manufacturing")
+ff_df$naics_label <- str_replace(ff_df$naics_label, "Petroleum and coal products manufacturing", "Petroleum & Coal Products")
+ff_df$race_label <- str_replace(ff_df$race_label, "Native Hawaiian and Other Pacific Islander", "Nat. Hawaiian & Other Pacific Islander")
+ff_df$race_label <- str_replace(ff_df$race_label, "American Indian and Alaska Native", "American Indian & Alaska Native")
+ff_df$ethnicity_label <- str_replace(ff_df$ethnicity_label, "Equally Hispanic/non-Hispanic", "Equally Hispanic/Non-Hispanic")
+ff_df
+```
+
+```{r}
+unclass <- ff_df %>%
+  filter(race_label == "Unclassifiable")
+num_unclass <- unclass$employer_firms
+print('The number of unclassifiable firms for these industries are:')
+num_unclass
+```
+
+
+```{r}
+sex_firms <- ff_df %>%
+  select(naics_label, sex_label, employer_firms) %>%
+  filter(sex_label!="Classifiable", sex_label!="Total", sex_label!="Unclassifiable") #%>%
+
+p <- ggplot(data = sex_firms, mapping = aes(x = reorder(sex_label, employer_firms), y = employer_firms))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Sex", x="", y="Employer Firms") + coord_flip()
+```
+
+
+
+```{r}
+sex_firms <- ff_df %>%
+  select(naics_label, sex_label, employer_firms) %>%
+  filter(sex_label!="Classifiable", sex_label!="Total", sex_label!="Unclassifiable") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = sex_firms, mapping = aes(x = reorder(naics_label, employer_firms), y = employer_firms, fill=sex_label))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Sex", x="", y="Employer Firms") + coord_flip() + theme(legend.position="bottom", legend.title = element_blank())
+```
+
+
+
+```{r}
+sex_firms <- ff_df %>%
+  select(naics_label, sex_label, employer_firms) %>%
+  filter(sex_label!="Classifiable", sex_label!="Total", sex_label!="Unclassifiable") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = sex_firms, mapping = aes(x = sex_label, y = employer_firms))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Sex", x="", y="Employer Firms") + facet_wrap(~ naics_label, scale="free_x") + coord_flip()
+```
+
+
+```{r}
+eth_firms <- ff_df %>%
+  select(naics_label, ethnicity_label, employer_firms) %>%
+  filter(ethnicity_label!="Total", ethnicity_label!="Classifiable", ethnicity_label!="Unclassifiable")
+
+p <- ggplot(data = eth_firms, mapping = aes(x = ethnicity_label, y = employer_firms))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Ethnicity", x="", y="Employer Firms") + coord_flip()
+```
+
+
+
+```{r}
+eth_firms <- ff_df %>%
+  select(naics_label, ethnicity_label, employer_firms) %>%
+  filter(ethnicity_label!="Total", ethnicity_label!="Classifiable", ethnicity_label!="Unclassifiable") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = eth_firms, mapping = aes(x = reorder(naics_label, employer_firms), y = employer_firms, fill=ethnicity_label))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Ethnicity", x="", y="Employer Firms") + coord_flip() + theme(legend.position="bottom", legend.title = element_blank())
+```
+
+
+
+```{r}
+eth_firms <- ff_df %>%
+  select(naics_label, ethnicity_label, employer_firms) %>%
+  filter(ethnicity_label!="Total", ethnicity_label!="Classifiable", ethnicity_label!="Unclassifiable") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = eth_firms, mapping = aes(x = ethnicity_label, y = employer_firms))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Ethnicity", x="", y="Employer Firms") + facet_wrap(~ naics_label, scale="free_x") + coord_flip()
+```
+
+
+```{r}
+race_firms <- ff_df %>%
+  select(naics_label, race_label, employer_firms) %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable")
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(race_label, employer_firms), y = employer_firms))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Race", x="", y="Employer Firms") + coord_flip()
+```
+
+
+
+```{r}
+
+race_firms <- ff_df %>%
+  select(naics_label, race_label, employer_firms) %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(naics_label, employer_firms), y = employer_firms, fill=race_label))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Race", x="", y="Employer Firms") + coord_flip() + theme(legend.position="bottom", legend.title = element_blank())  + guides(fill=guide_legend(nrow=2,byrow=TRUE))
+```
+
+
+
+```{r}
+race_firms <- ff_df %>%
+  select(naics_label, race_label, employer_firms) %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(race_label, employer_firms), y = employer_firms))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Race", x="", y="Employer Firms") + facet_wrap(~ naics_label, scale="free_x") + coord_flip()
+```
+
+
+
+```{r}
+race_firms <- ff_df %>%
+  select(naics_label, race_label, employer_firms) %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable", race_label!="White") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(naics_label, employer_firms), y = employer_firms, fill=race_label))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Race (Nonwhite)", x="", y="Employer Firms") + coord_flip() + theme(legend.position="bottom", legend.title = element_blank()) + guides(fill=guide_legend(nrow=2, byrow=TRUE))
+```
+
+
+```{r}
+race_firms <- ff_df %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable", race_label!="White") %>%
+  select(race_label,employer_firms) %>%
+  group_by(race_label) %>%
+  summarize(firms=sum(employer_firms)) %>%
+  mutate(pct=round(firms/sum(firms)*100,2))
+
+p <- ggplot(data = race_firms, mapping = aes(x = "", y = pct, fill=race_label))
+
+p + geom_col(color="white") + coord_polar(theta = "y", start = 0) + theme_void() + theme(legend.position="right", legend.title = element_blank()) +  labs(title="Top 5 Performing Industries by Race (Nonwhite)") + geom_text(aes(label = paste0(pct, "%"), x = 1.35), color = "black", position = position_stack(vjust = 0.5), cex=3.5) + scale_fill_brewer(palette = "Dark2")
+```
+
+
+
+```{r}
+race_firms <- ff_df %>%
+  select(naics_label, race_label, employer_firms) %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable", race_label!="White") %>%
+  group_by(naics_label)
+
+p <- ggplot(data = race_firms, mapping = aes(x = reorder(race_label, employer_firms), y = employer_firms))
+
+p + geom_col() + labs(title="Top 5 Performing Industries by Race", x="", y="Employer Firms") + facet_wrap(~ naics_label, scale="free_x") + coord_flip()
+```
+
+
+```{r}
+race_firms <- ff_df %>%
+  select(naics_label, race_label, employer_firms) %>%
+  filter(race_label!="Total", race_label!="Classifiable", race_label!="Unclassifiable", race_label!="White") %>%
+  group_by(naics_label) %>%
+  mutate(pct=round(employer_firms/sum(employer_firms)*100,2))
+
+p <- ggplot(data = race_firms, mapping = aes(x = "", y = pct, fill=race_label))
+
+p + geom_col() + facet_wrap(~ naics_label) + coord_polar(theta = "y", start = 0) + theme_void() + theme(legend.position="bottom", legend.title = element_blank()) + labs(title="Top 5 Performing Industries by Race (Nonwhite)\n") + guides(fill=guide_legend(nrow=2,byrow=TRUE)) + geom_text(aes(label = paste0(round(pct,0), "%"), x = 1.2), color = "black", position = position_stack(vjust = 0.5), cex=2)
+```
+
+
